@@ -5,8 +5,7 @@ const app = express();
 
 // basic middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://taskmsr.netlify.app'],
-    credentials: true
+    origin: '*'
 })); // allow cross-origin requests
 app.use(express.json()); // parse incoming json data
 
