@@ -1,15 +1,16 @@
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const sendResponse = require('../utils/response');
 
 exports.protect = async (req, res, next) => {
-    let token;
+    let token = req.cookies?.accessToken;
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         token = req.headers.authorization.split(' ')[1];
     }
 
     if (!token) {
-        return res.status(401).json({ message: 'Not authorized, no token' });
+        return sendResponse(res, 401, false, 'Not authorized, no token');
     }
 
     try {
@@ -17,6 +18,18 @@ exports.protect = async (req, res, next) => {
         req.user = await User.findById(decoded.id);
         next();
     } catch (error) {
-        return res.status(401).json({ message: 'Not authorized, token failed' });
+        if (error.name === 'TokenExpiredError') {
+            return sendResponse(res, 401, false, 'Token expired');
+        }
+        return sendResponse(res, 401, false, 'Not authorized, token failed');
     }
+};
+
+exports.authorize = (...roles) => {
+    return (req, res, next) => {
+        if (!roles.includes(req.user.role)) {
+            return sendResponse(res, 403, false, `User role ${req.user.role} is not authorized`);
+        }
+        next();
+    };
 };
