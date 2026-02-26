@@ -6,21 +6,31 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token') || null);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
+    // Verify session on mount by hitting a protected profile route or refreshing the token
     useEffect(() => {
-        if (token) {
-            setUser({ token });
-        }
-    }, [token]);
+        const verifySession = async () => {
+            try {
+                // We use a silent instance or catch the error explicitly so it doesn't pollute the console
+                // if the user is simply not logged in yet.
+                await api.post('/auth/refresh');
+                setUser({ authenticated: true });
+            } catch (err) {
+                // Expected if the user has no cookies yet (401). We just leave user as null.
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+        verifySession();
+    }, []);
 
     const login = async (email, password) => {
         try {
             const res = await api.post('/auth/login', { email, password });
-            localStorage.setItem('token', res.data.token);
-            setToken(res.data.token);
-            setUser({ token: res.data.token, role: res.data.role });
+            setUser({ authenticated: true, role: res.data.data.role });
             navigate('/');
             return { success: true };
         } catch (error) {
@@ -31,9 +41,7 @@ export const AuthProvider = ({ children }) => {
     const register = async (name, email, password) => {
         try {
             const res = await api.post('/auth/register', { name, email, password });
-            localStorage.setItem('token', res.data.token);
-            setToken(res.data.token);
-            setUser({ token: res.data.token, role: res.data.role });
+            setUser({ authenticated: true, role: res.data.data.role });
             navigate('/');
             return { success: true };
         } catch (error) {
@@ -41,16 +49,19 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setToken(null);
+    const logout = async () => {
+        try {
+            await api.post('/auth/logout');
+        } catch (err) {
+            console.error('Logout error', err);
+        }
         setUser(null);
         navigate('/login');
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, register, logout }}>
-            {children}
+        <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+            {!loading && children}
         </AuthContext.Provider>
     );
 };
