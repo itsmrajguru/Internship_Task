@@ -1,93 +1,61 @@
-# Task Management Full-Stack Application
+# TaskMSR - Production SaaS Task Manager
 
-A scalable REST API and React frontend application for managing tasks, built carefully to demonstrate fundamental backend and frontend principles.
+TaskMSR is a highly secure, robust, structured Task Management System built entirely on the MERN stack using a Clean Architecture design pattern. It features JWT HTTP-Only cookie authentication, AES encryption, status filtering, offset pagination, dynamic search, and an enterprise SaaS dashboard.
 
-## Features
-- **Backend**: Node.js, Express, MongoDB
-- **Security**: JWT Authentication, bcrypt password hashing
-- **Role-Based Access**: `user` and `admin` roles
-- **Swagger Documentation**: Integrated API documentation
-- **Frontend**: React (Vite), Context API for state management, Axios
+## Technical Stack
+- **Frontend**: React.js, Vite, Axios, Pure Vanilla CSS (SaaS aesthetic layout).
+- **Backend**: Node.js, Express.js, MongoDB (Mongoose), JSON Web Tokens (JWT).
+- **Security**: Helmet, Express Rate Limiter, Express Mongo Sanitize, Cookie Parser.
+- **Tooling**: Git, ESLint.
 
----
+## Architecture Guidelines (Clean Architecture)
+The backend was strictly decoupled from standard MVC to a multi-layer schema for scale:
+- `controllers/`: Handles HTTP requests, validations, and mapping data into the structured JSON `{success, message, data, error}` format.
+- `services/`: Encapsulates core business constraints (e.g. checking user ownership before deletion, password verification, hashing).
+- `repositories/`: The database abstraction layer. Handles Mongoose queries directly.
+- `utils/`: Reusable standalone logic (e.g. AES Encryption, standard response formatter, token generators).
 
-## Folder Structure
-```
-project-root/
-│
-├── backend/                  # Express API Server
-│   ├── .env                  # Environment Variables
-│   ├── src/
-│   │   ├── config/           # DB & Swagger configuration
-│   │   ├── controllers/      # Route handlers
-│   │   ├── middleware/       # Auth & Error handling
-│   │   ├── models/           # Mongoose Schemas
-│   │   └── routes/           # Express Routes
-│   └── server.js             # Entry Point
-│
-└── frontend/                 # Vite React App
-    ├── src/
-    │   ├── api.js            # Axios Config
-    │   ├── components/       # Reusable UI (Navbar, ProtectedRoute)
-    │   ├── context/          # AuthContext
-    │   └── pages/            # Login, Register, Dashboard
-    └── index.html
-```
+## Security Features & Authentication
+1. **HTTP-Only Secure Cookies:** JWTs are no longer stored in `localStorage` which is prone to XSS attacks. They are passed entirely through cookies.
+2. **Refresh Token Flow:** Access Tokens are short-lived (15 mins), Refresh Tokens are long-lived (7 days). `/auth/refresh` keeps the user logged in silently.
+3. **AES Payload Encryption:** An encryption utility securely ciphers payload data when needed before it enters database storage.
+4. **Rate Limiting & NoSQL Injection Protection:** Block repetitive DDoS attempts and sanitize mongo constraints automatically.
 
----
+## API Documentation
+The API adheres strictly to REST principles, returning consistent response shapes.
 
-## Setup Instructions
+### Auth
+- `POST /api/v1/auth/register` - Create account (returns cookies).
+- `POST /api/v1/auth/login` - Authenticate account (returns cookies).
+- `POST /api/v1/auth/logout` - Clear specific tokens from client cookies.
+- `POST /api/v1/auth/refresh` - Swap a valid refresh cookie for a new access cookie.
 
-### 1. Prerequisites
-- Node.js installed
-- Running MongoDB instance (locally via port 27017)
+### Tasks
+- `GET /api/v1/tasks` - Retrieve Tasks. Supports query strings:
+  - `?page=1` & `?limit=6` (Pagination)
+  - `?status=pending` (Database Status Filter)
+  - `?search=hello` (Regex Title Search)
+- `POST /api/v1/tasks` - Create Task.
+- `PUT /api/v1/tasks/:id` - Update Task (Ownership enforced via Service layer).
+- `DELETE /api/v1/tasks/:id` - Delete Task (Ownership enforced).
 
-### 2. Backend Setup
-Navigate into the `backend` folder:
-```bash
-cd backend
-npm install
-```
+## Deployment Guide
 
-Make sure the `.env` file exists with:
-```env
-PORT=5000
-MONGO_URI=mongodb://127.0.0.1:27017/taskapp
-JWT_SECRET=supersecretjwtkey_12345
-JWT_EXPIRE=1h
-NODE_ENV=development
-```
+### Backend (Render / Railway)
+1. Fork/Clone the repository.
+2. Link the web service to the internal GitHub repo.
+3. Use Build Command: `npm install` and Start Command: `npm run dev`.
+4. Environment Variables Required:
+   - `PORT=5000`
+   - `NODE_ENV=production`
+   - `MONGO_URI=<Your MongoDB Atlas String>`
+   - `JWT_SECRET=<Strong Secret>`
+   - `JWT_REFRESH_SECRET=<Strong Secret>`
+   - `ENCRYPTION_KEY=<32 Byte Hex Key>`
 
-Run the server:
-```bash
-npm run dev
-```
-
-### 3. Frontend Setup
-Navigate into the `frontend` folder:
-```bash
-cd frontend
-npm install
-```
-
-Run the React app:
-```bash
-npm run dev
-```
-
----
-
-## API Documentation Links
-Once the backend is running, you can view the Swagger UI documentation at:
-**[http://localhost:5000/api-docs](http://localhost:5000/api-docs)**
-
----
-
-## Scalability Notes
-- **Folder Structure**: Controllers, routes, and services (currently within controllers) are separated, making it easy to mock out database calls or add a dedicated services layer in the future.
-- **Centralized Error Handling**: Ensures all API endpoints return consistent error responses, and avoids duplicate error logic scattered across controllers.
-- **API Versioning**: Enforcing the `/api/v1` prefix means future breaking changes can be pushed to `/api/v2` without disrupting existing clients.
-
-## Deployment Suggestions
-- **Backend (Render/Heroku)**: Add process.env.MONGO_URI for your MongoDB Atlas connection. Inject JWT secrets securely via dashboard.
-- **Frontend (Vercel/Netlify)**: Update the `api.js` baseURL to point strictly to the deployed backend URL instead of localhost. Combine the Vite build dir if aiming for a unified Express delivery, or deploy decoupled for best performance.
+### Frontend (Vercel / Netlify)
+1. Link Vercel/Netlify to existing repository.
+2. Root Directory: `/frontend`.
+3. Set environment variables:
+   - `VITE_API_URL=https://<your-backend-render-domain>.com/api/v1`
+4. Deploy the main branch.
