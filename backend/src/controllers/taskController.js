@@ -1,100 +1,70 @@
-const Task = require('../models/Task');
+const taskService = require('../services/taskService');
 const { validationResult } = require('express-validator');
+const sendResponse = require('../utils/response');
 
-exports.createTask = async (req, res) => {
+exports.createTask = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return sendResponse(res, 400, false, 'Validation Error', null, errors.array());
     }
 
     try {
-        req.body.user = req.user.id;
-
-        const task = await Task.create(req.body);
-        res.status(201).json({ success: true, data: task });
+        const task = await taskService.createTask(req.user.id, req.body);
+        return sendResponse(res, 201, true, 'Task created successfully', task);
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        next(error);
     }
 };
 
-exports.getTasks = async (req, res) => {
+exports.getTasks = async (req, res, next) => {
     try {
-        let query;
-        if (req.user.role === 'admin') {
-            query = Task.find();
-        } else {
-            query = Task.find({ user: req.user.id });
-        }
-
-        const tasks = await query;
-        res.status(200).json({ success: true, count: tasks.length, data: tasks });
+        const options = {
+            search: req.query.search,
+            status: req.query.status,
+            page: req.query.page,
+            limit: req.query.limit
+        };
+        const data = await taskService.getTasks(req.user.id, req.user.role, options);
+        return sendResponse(res, 200, true, 'Tasks retrieved successfully', data);
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        next(error);
     }
 };
 
-exports.getTask = async (req, res) => {
+exports.getTask = async (req, res, next) => {
     try {
-        const task = await Task.findById(req.params.id);
-
-        if (!task) {
-            return res.status(404).json({ success: false, message: 'Task not found' });
-        }
-
-        if (task.user.toString() !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ success: false, message: 'Not authorized to access this task' });
-        }
-
-        res.status(200).json({ success: true, data: task });
+        const task = await taskService.getTaskById(req.params.id, req.user.id, req.user.role);
+        return sendResponse(res, 200, true, 'Task retrieved successfully', task);
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        if (error.message === 'Task not found') return sendResponse(res, 404, false, error.message);
+        if (error.message === 'Not authorized') return sendResponse(res, 403, false, error.message);
+        next(error);
     }
 };
 
-exports.updateTask = async (req, res) => {
+exports.updateTask = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return sendResponse(res, 400, false, 'Validation Error', null, errors.array());
     }
 
     try {
-        let task = await Task.findById(req.params.id);
-
-        if (!task) {
-            return res.status(404).json({ success: false, message: 'Task not found' });
-        }
-
-        if (task.user.toString() !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ success: false, message: 'Not authorized to update this task' });
-        }
-
-        task = await Task.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true
-        });
-
-        res.status(200).json({ success: true, data: task });
+        const task = await taskService.updateTask(req.params.id, req.user.id, req.user.role, req.body);
+        return sendResponse(res, 200, true, 'Task updated successfully', task);
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        if (error.message === 'Task not found') return sendResponse(res, 404, false, error.message);
+        if (error.message === 'Not authorized') return sendResponse(res, 403, false, error.message);
+        next(error);
     }
 };
 
-exports.deleteTask = async (req, res) => {
+exports.deleteTask = async (req, res, next) => {
     try {
-        const task = await Task.findById(req.params.id);
-
-        if (!task) {
-            return res.status(404).json({ success: false, message: 'Task not found' });
-        }
-
-        if (task.user.toString() !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ success: false, message: 'Not authorized to delete this task' });
-        }
-
-        await task.deleteOne();
-
-        res.status(200).json({ success: true, data: {} });
+        await taskService.deleteTask(req.params.id, req.user.id, req.user.role);
+        return sendResponse(res, 200, true, 'Task deleted successfully');
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        if (error.message === 'Task not found') return sendResponse(res, 404, false, error.message);
+        if (error.message === 'Not authorized') return sendResponse(res, 403, false, error.message);
+        next(error);
     }
 };
